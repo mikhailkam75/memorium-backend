@@ -1,46 +1,61 @@
-// main.js — Мемориум: Бэкенд (MVP)
+// index.js — Мемориум: Бэкенд с Supabase
 const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Простая заглушка — список могилок
-let graves = [
-  {
-    id: 1,
-    type: "любовь",
-    title: "Анна, 2018–2021",
-    description: "Спасибо за всё. Я отпускаю.",
-    is_public: true,
-    created_at: "2025-04-05T12:00:00Z"
-  }
-];
+// 🔐 Настройка Supabase — твои данные
+const supabaseUrl = 'https://hxttvpgjqnsmhfxvbnsk.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4dHR2cGdqcW5zbWhmeHZibnNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzU3MjYsImV4cCI6MjA3MTgxMTcyNn0.BtdrzGZfYA4otzFuE_jpYLSMXfEAzrEZLQxODZuw__Y';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // GET / — проверка
 app.get('/', (req, res) => {
   res.json({ message: "Добро пожаловать в Мемориум. Здесь остаются отголоски." });
 });
 
-// GET /graves — получить все публичные могилки
-app.get('/graves', (req, res) => {
-  res.json(graves);
+// GET /graves — получить все могилки
+app.get('/graves', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('graves')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Ошибка при получении могилок:', err);
+    res.status(500).json({ error: 'Ошибка при получении могилок' });
+  }
 });
 
 // POST /graves — создать новую могилку
-app.post('/graves', (req, res) => {
+app.post('/graves', async (req, res) => {
   const { type, title, description } = req.body;
-  const newGrave = {
-    id: graves.length + 1,
-    type,
-    title,
-    description,
-    is_public: true,
-    created_at: new Date().toISOString()
-  };
-  graves.push(newGrave);
-  res.status(201).json(newGrave);
+
+  // Проверка обязательных полей
+  if (!type || !title || !description) {
+    return res.status(400).json({ error: 'Требуются поля: type, title, description' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('graves')
+      .insert([
+        { type, title, description, is_public: true }
+      ])
+      .select();
+
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (err) {
+    console.error('Ошибка при создании могилки:', err);
+    res.status(500).json({ error: 'Ошибка при создании могилки' });
+  }
 });
 
 // Запуск сервера
